@@ -15,6 +15,7 @@ package com.snowplowanalytics.snowplow.tracker;
 
 import android.content.Context;
 import android.net.Uri;
+import android.util.Base64;
 
 import com.snowplowanalytics.snowplow.tracker.constants.Parameters;
 import com.snowplowanalytics.snowplow.tracker.constants.TrackerConstants;
@@ -38,8 +39,11 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -51,6 +55,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Build an emitter object which controls the
@@ -79,6 +86,9 @@ public class Emitter {
     private long byteLimitGet;
     private long byteLimitPost;
     private TimeUnit timeUnit;
+    private String keyName;
+    private String key;
+
 
     private EventStore eventStore;
     private int emptyCount;
@@ -92,6 +102,9 @@ public class Emitter {
 
         final String uri; // Required
         final Context context; // Required
+        final String keyName;
+        final String key;
+
         RequestCallback requestCallback = null; // Optional
         HttpMethod httpMethod = HttpMethod.POST; // Optional
         BufferOption bufferOption = BufferOption.DefaultGroup; // Optional
@@ -104,12 +117,16 @@ public class Emitter {
         long byteLimitPost = 40000; // Optional
         TimeUnit timeUnit = TimeUnit.SECONDS;
 
+
+
         /**
          * @param uri The uri of the collector
          * @param context the android context
          */
-        public EmitterBuilder(String uri, Context context) {
+        public EmitterBuilder(String uri, String keyName, String key, Context context) {
             this.uri = uri;
+            this.keyName = keyName;
+            this.key = key;
             this.context = context;
         }
 
@@ -254,6 +271,8 @@ public class Emitter {
         this.uri = builder.uri;
         this.timeUnit = builder.timeUnit;
         this.eventStore = new EventStore(this.context, this.sendLimit);
+        this.key = builder.key;
+        this.keyName = builder.keyName;
 
         TLSArguments tlsArguments = new TLSArguments(this.tlsVersions);
         buildEmitterUri();
@@ -278,13 +297,14 @@ public class Emitter {
         else {
             this.uriBuilder = Uri.parse("https://" + this.uri).buildUpon();
         }
-        if (this.httpMethod == HttpMethod.GET) {
-            uriBuilder.appendPath("i");
-        }
-        else {
-            uriBuilder.appendEncodedPath(TrackerConstants.PROTOCOL_VENDOR + "/" +
-                    TrackerConstants.PROTOCOL_VERSION);
-        }
+        //if (this.httpMethod == HttpMethod.GET) {
+        //    uriBuilder.appendPath("i");
+        //
+        //}
+        //else {
+        //    uriBuilder.appendEncodedPath(TrackerConstants.PROTOCOL_VENDOR + "/" +
+        //            TrackerConstants.PROTOCOL_VERSION);
+        //}
     }
 
     // --- Controls
@@ -643,7 +663,11 @@ public class Emitter {
                 new SelfDescribingJson(TrackerConstants.SCHEMA_PAYLOAD_DATA, finalPayloads);
         String reqUrl = uriBuilder.build().toString();
         RequestBody reqBody = RequestBody.create(JSON, postPayload.toString());
+
+        String token = GetSASToken(this.uri, this.keyName, this.key);
+
         return new Request.Builder()
+                .header("Authorization", token)
                 .url(reqUrl)
                 .post(reqBody)
                 .build();
@@ -659,6 +683,63 @@ public class Emitter {
     private void addStmToEvent(Payload payload, String timestamp) {
         payload.add(Parameters.SENT_TIMESTAMP,
                 timestamp.equals("") ? Util.getTimestamp() : timestamp);
+    }
+
+    /**
+     * @return MS Eventhub SAS Token
+     */
+    public static String GetSASToken(String resourceUri, String keyName, String key)
+    {
+        long epoch = System.currentTimeMillis()/1000L;
+        int week = 60*60*24*7;
+        String expiry = Long.toString(epoch + week);
+
+        String sasToken = null;
+        try {
+            String stringToSign = URLEncoder.encode(resourceUri, "UTF-8") + "\n" + expiry;
+
+
+            String signature = getHMAC256(key, stringToSign);
+            sasToken = "SharedAccessSignature sr=" + URLEncoder.encode(resourceUri, "UTF-8") +"&sig=" +
+                    URLEncoder.encode(signature, "UTF-8") + "&se=" + expiry + "&skn=" + keyName;
+        } catch (UnsupportedEncodingException e) {
+
+            e.printStackTrace();
+        }
+
+        return sasToken;
+    }
+
+    /**
+     * Encodes input with key
+     * (for MS SAS)
+     *
+     * @param key to use for encryption
+     * @praam input to encrypt with key
+     * @return encrypted result
+     */
+    private static String getHMAC256(String key, String input) {
+        Mac sha256_HMAC = null;
+        String hash = null;
+        try {
+            sha256_HMAC = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secret_key = new SecretKeySpec(key.getBytes(), "HmacSHA256");
+            sha256_HMAC.init(secret_key);
+
+            byte[] data = input.getBytes("UTF-8");
+            hash = new String(Base64.encodeToString(sha256_HMAC.doFinal(data), Base64.NO_WRAP));
+
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+
+        return hash;
     }
 
     // Setters, Getters and Checkers
@@ -733,6 +814,28 @@ public class Emitter {
         if (!isRunning.get()) {
             this.uri = uri;
             buildEmitterUri();
+        }
+    }
+
+    /**
+     * Updates the key for the Emitter
+     *
+     * @param key SAS key to encrypt with
+     */
+    public void setEmitterKey(String key) {
+        if (!isRunning.get()) {
+            this.key = key;
+        }
+    }
+
+    /**
+     * Updates the keyName for the Emitter
+     *
+     * @param keyName SAS key name to encrypt with
+     */
+    public void setEmitterKeyName(String keyName) {
+        if (!isRunning.get()) {
+            this.keyName = keyName;
         }
     }
 
@@ -813,4 +916,7 @@ public class Emitter {
     public long getByteLimitPost() {
         return this.byteLimitPost;
     }
+
+
+
 }

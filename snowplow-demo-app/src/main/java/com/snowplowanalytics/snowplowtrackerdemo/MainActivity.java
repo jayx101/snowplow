@@ -13,14 +13,19 @@
 
 package com.snowplowanalytics.snowplowtrackerdemo;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.app.Activity;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.widget.Button;
 import android.view.View;
 import android.content.Intent;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.snowplowanalytics.snowplow.tracker.utils.LogLevel;
 import com.snowplowanalytics.snowplow.tracker.utils.Logger;
@@ -75,5 +80,16 @@ public class MainActivity extends Activity {
         String linkText4 = "- <a href='" + setup_guide_url + "'>Setup Guide</a>";
         link4.setText(Html.fromHtml(linkText4));
         link4.setMovementMethod(LinkMovementMethod.getInstance());
+
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED) {
+
+        } else {
+            ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        }
+
+
     }
 }

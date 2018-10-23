@@ -8,20 +8,24 @@ apply plugin: 'maven-publish'
 apply plugin: 'com.github.dcendents.android-maven'
 apply plugin: 'com.github.kt3k.coveralls'
 
+
 jacoco {
     toolVersion = "0.7.7.201606060606"
 }
 
 android {
     compileSdkVersion 24
-    buildToolsVersion "23.0.3"
+    buildToolsVersion '27.0.2'
 
     defaultConfig {
         minSdkVersion 14
         targetSdkVersion 24
         versionCode 1
         versionName "$project.version"
+        //multiDexEnabled = true
     }
+
+
 
     buildTypes {
         debug {
@@ -39,6 +43,8 @@ android {
         }
     }
 
+
+
     packagingOptions {
         exclude 'LICENSE.txt'
         exclude 'META-INF/LICENSE'
@@ -52,13 +58,18 @@ android {
         disable 'InvalidPackage'
         abortOnError false
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile fileTree(include: ['*.jar'], dir: 'libs')
     compile 'com.squareup.okhttp3:okhttp:3.4.1'
     androidTestCompile 'com.google.android.gms:play-services-analytics:9.0.2'
     androidTestCompile 'com.squareup.okhttp3:mockwebserver:3.4.1'
+    //compile 'com.microsoft.azure:azure-eventhubs:1.0.1'
 }
 
 android.libraryVariants.all { variant ->
@@ -69,9 +80,10 @@ android.libraryVariants.all { variant ->
         ext.androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
         classpath = files(variant.javaCompile.classpath.files) + files(ext.androidJar)
         options.links("http://docs.oracle.com/javase/7/docs/api/");
-        exclude '**/R.java'
+        exclude '*R.java'
     }
 }
+
 
 coveralls {
     jacocoReportPath "$buildDir/reports/coverage/debug/report.xml"

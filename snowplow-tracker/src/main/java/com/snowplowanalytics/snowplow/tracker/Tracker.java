@@ -452,7 +452,7 @@ public class Tracker {
         }
 
         // Build the final context and add it
-        SelfDescribingJson envelope = getFinalContext(context, eventId);
+         SelfDescribingJson envelope = getFinalContext(context, eventId);
         if (envelope != null) {
             payload.addMap(envelope.getMap(), this.base64Encoded, Parameters.CONTEXT_ENCODED,
                     Parameters.CONTEXT);

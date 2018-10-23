@@ -118,9 +118,11 @@ public class Demo extends Activity {
                         _radioHttp.getId() ? RequestSecurity.HTTP : RequestSecurity.HTTPS;
 
                 if (!e.getEmitterStatus()) {
-                    e.setEmitterUri(uri);
+                    e.setEmitterUri("ehubns-uat-hk-peak-di.servicebus.windows.net/ehub-uat-hk-peak-di/messages");
                     e.setRequestSecurity(security);
                     e.setHttpMethod(method);
+                    e.setEmitterKey("ivthHAaz0UJQYgEl1I4JMn7hXzokbEUQm8vH97umiN4=");
+                    e.setEmitterKeyName("RootManageSharedAccessKey");
                 }
 
                 if (!uri.equals("")) {
@@ -131,6 +133,10 @@ public class Demo extends Activity {
                 } else {
                     updateLogger("URI field empty!\n");
                 }
+
+                //String token = e.GetSASToken("https://ehubns-pre-hk-peak-di-x.servicebus.windows.net/ehub-pre-hk-peak-di/messages","RootManageSharedAccessKey","+63VV8wPlAzRt1Dgq2hPe+w8mYnDl2eKh/yMMSfUhag=");
+
+
             }
         });
     }
@@ -231,8 +237,8 @@ public class Demo extends Activity {
 
     // --- Tracker
 
-    private static final String namespace = "SnowplowAndroidTrackerDemo";
-    private static final String appId = "DemoID";
+        private static final String namespace = "SnowplowAndroidTrackerDemo";
+        private static final String appId = "DemoID";
 
     /**
      * Builds a Tracker
@@ -240,7 +246,8 @@ public class Demo extends Activity {
     private void initAndroidTracker() {
         Tracker.close();
 
-        Emitter emitter = new Emitter.EmitterBuilder("", this.getApplicationContext())
+        Emitter emitter = new Emitter.EmitterBuilder("ehubns-uat-hk-peak-di.servicebus.windows.net/ehub-uat-hk-peak-di/messages",
+                "RootManageSharedAccessKey","ivthHAaz0UJQYgEl1I4JMn7hXzokbEUQm8vH97umiN4=", this.getApplicationContext())
                 .callback(getCallback())
                 .tick(1)
                 .build();
@@ -261,7 +268,7 @@ public class Demo extends Activity {
                 .applicationCrash(true)
                 .lifecycleEvents(true)
                 .build()
-        ).setLifecycleHandler(this);
+        ).setLifecycleHandler(this.getApplicationContext());
     }
 
     /**
